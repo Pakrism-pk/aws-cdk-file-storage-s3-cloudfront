@@ -5,27 +5,26 @@ import { OriginAccessIdentity, CloudFrontWebDistribution } from '@aws-cdk/aws-cl
 import { Bucket } from '@aws-cdk/aws-s3';
 
 import config from './config.json';
+import { Duration } from '@aws-cdk/core';
 
 export class InfraStack extends cdk.Stack {
   constructor(scope: cdk.App, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const s3Bucket_documents_datasource:Bucket = new s3.Bucket(this, 'documents-storage-bucket', {
+    const s3Bucket_documents_datasource: Bucket = new s3.Bucket(this, 'assets-storage-bucket', {
       bucketName: `${config.PROJECT_NAME}-bucket`,
       publicReadAccess: false,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      websiteIndexDocument: config.WEBSITE.WEBSITE_INDEX_PAGE,
-      websiteErrorDocument: config.WEBSITE.WEBSITE_ERROR_PAGE
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL      
     });
     
     new cdk.CfnOutput(this, 'Bucket', { value: s3Bucket_documents_datasource.bucketName });
 
-    const oai: OriginAccessIdentity = new OriginAccessIdentity(this, 'document-access-oai');
+    const oai: OriginAccessIdentity = new OriginAccessIdentity(this, 'assets-access-oai');
     s3Bucket_documents_datasource.grantReadWrite(oai);
 
-    const distribution:CloudFrontWebDistribution = new cf.CloudFrontWebDistribution(this, 'document-cloudfront', {
+    const distribution:CloudFrontWebDistribution = new cf.CloudFrontWebDistribution(this, 'assets-cloudfront', {
       priceClass: cf.PriceClass.PRICE_CLASS_ALL,
-      comment: 'CDN to download and access docs from S3',
+      comment: 'CDN to download and access assets from S3',
       httpVersion:cf.HttpVersion.HTTP2,
       viewerProtocolPolicy:cf.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       originConfigs: [
@@ -35,7 +34,11 @@ export class InfraStack extends cdk.Stack {
             originAccessIdentity: oai
           },
           behaviors: [
-            { 
+            {
+              compress: true,
+              minTtl: Duration.days(1),
+              defaultTtl: Duration.days(15),
+              maxTtl: Duration.days(30),
               isDefaultBehavior: true, 
               allowedMethods: cf.CloudFrontAllowedMethods.ALL
             }
